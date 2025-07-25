@@ -69,7 +69,7 @@ if not st.session_state.admin_logged_in:
     admin_pin = st.text_input("Enter Admin PIN:", type="password")
     if admin_pin == ADMIN_PIN:
         st.session_state.admin_logged_in = True
-        st.experimental_rerun()
+        st.rerun()  # ✅ fixed here
     elif admin_pin != "":
         st.error("Incorrect PIN.")
 else:
@@ -81,7 +81,7 @@ else:
 
     if current_time - st.session_state.last_refresh > refresh_interval:
         st.session_state.last_refresh = current_time
-        st.experimental_rerun()
+        st.rerun()  # ✅ fixed here
 
     # Reload latest data for admin dashboard
     if os.path.exists(DATA_FILE):
@@ -105,4 +105,5 @@ else:
 
     st.write("### 📋 Full Check-In/Out Log (most recent first)")
     st.dataframe(df.iloc[::-1], use_container_width=True)
+
 
