@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime
 import os
+import time
 
 # --- Config ---
 DATA_FILE = "checkin_log.csv"
@@ -22,6 +23,9 @@ if "last_log_count" not in st.session_state:
 if "admin_logged_in" not in st.session_state:
     st.session_state.admin_logged_in = False
 
+if "last_refresh" not in st.session_state:
+    st.session_state.last_refresh = 0
+
 # --- Staff Form ---
 with st.form("checkin_form"):
     name = st.text_input("Enter your name:")
@@ -32,7 +36,6 @@ with st.form("checkin_form"):
     status = st.radio("Status:", ["Check In", "Check Out"])
     notes = st.text_input("Optional notes (e.g. ETA 1600):")
 
-    # Show Flight Name if required
     flight_name = ""
     if "aviation" in department.lower() or "survival" in department.lower():
         flight_name = st.text_input("Flight Name (required for Aviation/Survival):")
@@ -50,13 +53,11 @@ with st.form("checkin_form"):
             "Notes": notes,
             "Flight Name": flight_name if flight_name else ""
         }
-
         new_df = pd.DataFrame([record])
         df = pd.concat([df, new_df], ignore_index=True)
         df.to_csv(DATA_FILE, index=False)
         st.success("✅ Submitted!")
 
-# --- Divider
 st.markdown("---")
 
 # --- Admin Section ---
@@ -67,20 +68,18 @@ if admin_pin == ADMIN_PIN:
     st.session_state.admin_logged_in = True
     st.success("Access granted.")
 
-    # Auto-refresh every 10 seconds ONLY in admin view
-    refresh_seconds = 10
-    st.markdown(f"""
-        <script>
-            setTimeout(function() {{
-                window.location.reload();
-            }}, {refresh_seconds * 1000});
-        </script>
-    """, unsafe_allow_html=True)
+    # Auto-refresh every 10 seconds in Python
+    refresh_interval = 10  # seconds
+    current_time = time.time()
+
+    # Check if enough time passed since last refresh
+    if current_time - st.session_state.last_refresh > refresh_interval:
+        st.session_state.last_refresh = current_time
+        st.experimental_rerun()
 
     if os.path.exists(DATA_FILE):
         df = pd.read_csv(DATA_FILE)
 
-        # Display grouped status
         checkin_df = df[df["Status"] == "Check In"]
         grouped = checkin_df.groupby(["Location", "Department"])["Name"].count().reset_index()
         grouped.columns = ["Location", "Department", "Total Checked In"]
@@ -94,4 +93,5 @@ if admin_pin == ADMIN_PIN:
         st.info("No data file found.")
 elif admin_pin != "":
     st.error("Incorrect PIN.")
+
 
