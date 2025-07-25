@@ -4,29 +4,27 @@ from datetime import datetime
 import os
 import time
 
-# --- Config ---
+# Config
 DATA_FILE = "checkin_log.csv"
 ADMIN_PIN = "2025"
 st.set_page_config(page_title="CTC Staff Check-In / Check-Out", layout="centered")
 st.title("📝 CTC Staff Check-In / Check-Out")
 
-# --- Load CSV
+# Load data file or create empty df
 if os.path.exists(DATA_FILE):
     df = pd.read_csv(DATA_FILE)
 else:
     df = pd.DataFrame(columns=["Name", "Department", "Location", "Status", "Time", "Notes", "Flight Name"])
 
-# --- Session init
+# Initialize session state variables
 if "last_log_count" not in st.session_state:
     st.session_state.last_log_count = len(df)
-
 if "admin_logged_in" not in st.session_state:
     st.session_state.admin_logged_in = False
-
 if "last_refresh" not in st.session_state:
     st.session_state.last_refresh = 0
 
-# --- Staff Form ---
+# --- Staff Check-in/out form ---
 with st.form("checkin_form"):
     name = st.text_input("Enter your name:")
     department = st.text_input("Enter your department:")
@@ -68,30 +66,31 @@ if admin_pin == ADMIN_PIN:
     st.session_state.admin_logged_in = True
     st.success("Access granted.")
 
-    # Auto-refresh every 10 seconds in Python
+    # Auto-refresh every 10 seconds (Python-only)
     refresh_interval = 10  # seconds
     current_time = time.time()
 
-    # Check if enough time passed since last refresh
+    # Reload page after interval
     if current_time - st.session_state.last_refresh > refresh_interval:
         st.session_state.last_refresh = current_time
         st.experimental_rerun()
 
+    # Reload latest data on every run (so all devices' entries show)
     if os.path.exists(DATA_FILE):
         df = pd.read_csv(DATA_FILE)
-
-        checkin_df = df[df["Status"] == "Check In"]
-        grouped = checkin_df.groupby(["Location", "Department"])["Name"].count().reset_index()
-        grouped.columns = ["Location", "Department", "Total Checked In"]
-
-        st.write("### 📍 Current Check-Ins by Location & Department")
-        st.dataframe(grouped, use_container_width=True)
-
-        st.write("### 📋 Full Check-In/Out Log")
-        st.dataframe(df[::-1], use_container_width=True)
     else:
-        st.info("No data file found.")
+        df = pd.DataFrame(columns=["Name", "Department", "Location", "Status", "Time", "Notes", "Flight Name"])
+
+    # Show grouped current check-ins
+    checkin_df = df[df["Status"] == "Check In"]
+    grouped = checkin_df.groupby(["Location", "Department"])["Name"].count().reset_index()
+    grouped.columns = ["Location", "Department", "Total Checked In"]
+
+    st.write("### 📍 Current Check-Ins by Location & Department")
+    st.dataframe(grouped, use_container_width=True)
+
+    st.write("### 📋 Full Check-In/Out Log")
+    st.dataframe(df[::-1], use_container_width=True)
+
 elif admin_pin != "":
     st.error("Incorrect PIN.")
-
-
