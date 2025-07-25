@@ -1,0 +1,107 @@
+import streamlit as st
+import pandas as pd
+from datetime import datetime
+import os
+from streamlit_autorefresh import st_autorefresh
+import json
+
+# --- Config ---
+DATA_FILE = "checkin_log.csv"
+ADMIN_PIN = "2025"
+st.set_page_config(page_title="CTC Staff Check-In / Check-Out", layout="centered")
+st.title("📝 CTC Staff Check-In / Check-Out")
+
+# --- Load CSV
+if os.path.exists(DATA_FILE):
+    df = pd.read_csv(DATA_FILE)
+else:
+    df = pd.DataFrame(columns=["Name", "Department", "Location", "Status", "Time", "Notes", "Flight Name"])
+
+# --- Session init
+if "last_log_count" not in st.session_state:
+    st.session_state.last_log_count = len(df)
+
+if "admin_logged_in" not in st.session_state:
+    st.session_state.admin_logged_in = False
+
+# --- Staff Form ---
+with st.form("checkin_form"):
+    name = st.text_input("Enter your name:")
+    department = st.text_input("Enter your department:")
+    location = st.selectbox("Current Location:", [
+        "Main Training Site", "Survival FTA", "LegoLand", "City of Cold Lake", "Other"
+    ])
+    status = st.radio("Status:", ["Check In", "Check Out"])
+    notes = st.text_input("Optional notes (e.g. ETA 1600):")
+
+    # Show Flight Name if required
+    flight_name = ""
+    if "aviation" in department.lower() or "survival" in department.lower():
+        flight_name = st.text_input("Flight Name (required for Aviation/Survival):")
+
+    submitted = st.form_submit_button("Submit")
+
+    if submitted:
+        time_now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        record = {
+            "Name": name,
+            "Department": department,
+            "Location": location,
+            "Status": status,
+            "Time": time_now,
+            "Notes": notes,
+            "Flight Name": flight_name if flight_name else ""
+        }
+
+        new_df = pd.DataFrame([record])
+        df = pd.concat([df, new_df], ignore_index=True)
+        df.to_csv(DATA_FILE, index=False)
+        st.success("✅ Submitted!")
+
+# --- Divider
+st.markdown("---")
+
+# --- Admin Section ---
+st.subheader("🔒 Ops Dashboard (Admin Access Only)")
+admin_pin = st.text_input("Enter Admin PIN:", type="password")
+
+if admin_pin == ADMIN_PIN:
+    st.session_state.admin_logged_in = True
+    st.success("Access granted.")
+
+    # Auto-refresh every 10 seconds
+    st_autorefresh(interval=10 * 1000, key="admin_refresh")
+
+    if os.path.exists(DATA_FILE):
+        df = pd.read_csv(DATA_FILE)
+
+        current_log_count = len(df)
+
+        # 🔔 Alert for new entry
+        if current_log_count > st.session_state.last_log_count:
+            st.session_state.last_log_count = current_log_count
+
+            # Visual Alert
+            st.markdown("## 🔔 **New Check-In/Out Submitted!**")
+
+            # Sound Alert
+            st.markdown("""
+                <audio autoplay>
+                    <source src="https://www.myinstants.com/media/sounds/ding-sound-effect_2.mp3" type="audio/mpeg">
+                </audio>
+            """, unsafe_allow_html=True)
+
+        # Display grouped status
+        checkin_df = df[df["Status"] == "Check In"]
+        grouped = checkin_df.groupby(["Location", "Department"])["Name"].count().reset_index()
+        grouped.columns = ["Location", "Department", "Total Checked In"]
+
+        st.write("### 📍 Current Check-Ins by Location & Department")
+        st.dataframe(grouped, use_container_width=True)
+
+        st.write("### 📋 Full Check-In/Out Log")
+        st.dataframe(df[::-1], use_container_width=True)
+    else:
+        st.info("No data file found.")
+elif admin_pin != "":
+    st.error("Incorrect PIN.")
