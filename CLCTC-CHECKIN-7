@@ -4,27 +4,24 @@ from datetime import datetime
 import os
 import time
 
-# Config
+# --- Config ---
 DATA_FILE = "checkin_log.csv"
 ADMIN_PIN = "2025"
+
 st.set_page_config(page_title="CTC Staff Check-In / Check-Out", layout="centered")
 st.title("📝 CTC Staff Check-In / Check-Out")
 
-# Load data file or create empty df
+# --- Load existing data or create empty DataFrame ---
 if os.path.exists(DATA_FILE):
     df = pd.read_csv(DATA_FILE)
 else:
     df = pd.DataFrame(columns=["Name", "Department", "Location", "Status", "Time", "Notes", "Flight Name"])
 
-# Initialize session state variables
-if "last_log_count" not in st.session_state:
-    st.session_state.last_log_count = len(df)
-if "admin_logged_in" not in st.session_state:
-    st.session_state.admin_logged_in = False
+# --- Initialize session state variables ---
 if "last_refresh" not in st.session_state:
     st.session_state.last_refresh = 0
 
-# --- Staff Check-in/out form ---
+# --- Staff Check-in/out Form ---
 with st.form("checkin_form"):
     name = st.text_input("Enter your name:")
     department = st.text_input("Enter your department:")
@@ -41,20 +38,25 @@ with st.form("checkin_form"):
     submitted = st.form_submit_button("Submit")
 
     if submitted:
-        time_now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        record = {
-            "Name": name,
-            "Department": department,
-            "Location": location,
-            "Status": status,
-            "Time": time_now,
-            "Notes": notes,
-            "Flight Name": flight_name if flight_name else ""
-        }
-        new_df = pd.DataFrame([record])
-        df = pd.concat([df, new_df], ignore_index=True)
-        df.to_csv(DATA_FILE, index=False)
-        st.success("✅ Submitted!")
+        if not name or not department:
+            st.error("Please enter at least your name and department.")
+        elif ("aviation" in department.lower() or "survival" in department.lower()) and not flight_name:
+            st.error("Flight Name is required for Aviation or Survival departments.")
+        else:
+            time_now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            record = {
+                "Name": name,
+                "Department": department,
+                "Location": location,
+                "Status": status,
+                "Time": time_now,
+                "Notes": notes,
+                "Flight Name": flight_name if flight_name else ""
+            }
+            # Append new record to dataframe and save CSV
+            df = pd.concat([df, pd.DataFrame([record])], ignore_index=True)
+            df.to_csv(DATA_FILE, index=False)
+            st.success("✅ Submitted!")
 
 st.markdown("---")
 
@@ -63,34 +65,33 @@ st.subheader("🔒 Ops Dashboard (Admin Access Only)")
 admin_pin = st.text_input("Enter Admin PIN:", type="password")
 
 if admin_pin == ADMIN_PIN:
-    st.session_state.admin_logged_in = True
     st.success("Access granted.")
 
-    # Auto-refresh every 10 seconds (Python-only)
+    # Auto-refresh every 10 seconds using Python timer and rerun
     refresh_interval = 10  # seconds
     current_time = time.time()
 
-    # Reload page after interval
     if current_time - st.session_state.last_refresh > refresh_interval:
         st.session_state.last_refresh = current_time
         st.experimental_rerun()
 
-    # Reload latest data on every run (so all devices' entries show)
+    # Reload latest data for admin dashboard
     if os.path.exists(DATA_FILE):
         df = pd.read_csv(DATA_FILE)
     else:
+        st.info("No data file found.")
         df = pd.DataFrame(columns=["Name", "Department", "Location", "Status", "Time", "Notes", "Flight Name"])
 
-    # Show grouped current check-ins
-    checkin_df = df[df["Status"] == "Check In"]
-    grouped = checkin_df.groupby(["Location", "Department"])["Name"].count().reset_index()
+    # Show grouped check-ins by Location and Department
+    checked_in = df[df["Status"] == "Check In"]
+    grouped = checked_in.groupby(["Location", "Department"])["Name"].count().reset_index()
     grouped.columns = ["Location", "Department", "Total Checked In"]
 
     st.write("### 📍 Current Check-Ins by Location & Department")
     st.dataframe(grouped, use_container_width=True)
 
-    st.write("### 📋 Full Check-In/Out Log")
-    st.dataframe(df[::-1], use_container_width=True)
+    st.write("### 📋 Full Check-In/Out Log (most recent first)")
+    st.dataframe(df.iloc[::-1], use_container_width=True)
 
 elif admin_pin != "":
     st.error("Incorrect PIN.")
