@@ -80,22 +80,6 @@ if admin_pin == ADMIN_PIN:
     if os.path.exists(DATA_FILE):
         df = pd.read_csv(DATA_FILE)
 
-        current_log_count = len(df)
-
-        # 🔔 Alert for new entry
-        if current_log_count > st.session_state.last_log_count:
-            st.session_state.last_log_count = current_log_count
-
-            # Visual Alert
-            st.markdown("## 🔔 **New Check-In/Out Submitted!**")
-
-            # Sound Alert (may not autoplay in some browsers)
-            st.markdown("""
-                <audio autoplay>
-                    <source src="https://www.myinstants.com/media/sounds/ding-sound-effect_2.mp3" type="audio/mpeg">
-                </audio>
-            """, unsafe_allow_html=True)
-
         # Display grouped status
         checkin_df = df[df["Status"] == "Check In"]
         grouped = checkin_df.groupby(["Location", "Department"])["Name"].count().reset_index()
@@ -110,3 +94,4 @@ if admin_pin == ADMIN_PIN:
         st.info("No data file found.")
 elif admin_pin != "":
     st.error("Incorrect PIN.")
+
