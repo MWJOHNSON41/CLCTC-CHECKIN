@@ -18,6 +18,8 @@ else:
     df = pd.DataFrame(columns=["Name", "Department", "Location", "Status", "Time", "Notes", "Flight Name"])
 
 # --- Initialize session state variables ---
+if "admin_logged_in" not in st.session_state:
+    st.session_state.admin_logged_in = False
 if "last_refresh" not in st.session_state:
     st.session_state.last_refresh = 0
 
@@ -62,10 +64,16 @@ st.markdown("---")
 
 # --- Admin Section ---
 st.subheader("🔒 Ops Dashboard (Admin Access Only)")
-admin_pin = st.text_input("Enter Admin PIN:", type="password")
 
-if admin_pin == ADMIN_PIN:
-    st.success("Access granted.")
+if not st.session_state.admin_logged_in:
+    admin_pin = st.text_input("Enter Admin PIN:", type="password")
+    if admin_pin == ADMIN_PIN:
+        st.session_state.admin_logged_in = True
+        st.experimental_rerun()
+    elif admin_pin != "":
+        st.error("Incorrect PIN.")
+else:
+    st.success("Access granted. You are logged in as Admin.")
 
     # Auto-refresh every 10 seconds using Python timer and rerun
     refresh_interval = 10  # seconds
@@ -82,16 +90,19 @@ if admin_pin == ADMIN_PIN:
         st.info("No data file found.")
         df = pd.DataFrame(columns=["Name", "Department", "Location", "Status", "Time", "Notes", "Flight Name"])
 
-    # Show grouped check-ins by Location and Department
+    # Show grouped check-ins separately for Location and Department
     checked_in = df[df["Status"] == "Check In"]
-    grouped = checked_in.groupby(["Location", "Department"])["Name"].count().reset_index()
-    grouped.columns = ["Location", "Department", "Total Checked In"]
 
-    st.write("### 📍 Current Check-Ins by Location & Department")
-    st.dataframe(grouped, use_container_width=True)
+    st.write("### 📍 Current Check-Ins by Location")
+    grouped_location = checked_in.groupby("Location")["Name"].count().reset_index()
+    grouped_location.columns = ["Location", "Total Checked In"]
+    st.dataframe(grouped_location, use_container_width=True)
+
+    st.write("### 🏢 Current Check-Ins by Department")
+    grouped_department = checked_in.groupby("Department")["Name"].count().reset_index()
+    grouped_department.columns = ["Department", "Total Checked In"]
+    st.dataframe(grouped_department, use_container_width=True)
 
     st.write("### 📋 Full Check-In/Out Log (most recent first)")
     st.dataframe(df.iloc[::-1], use_container_width=True)
 
-elif admin_pin != "":
-    st.error("Incorrect PIN.")
