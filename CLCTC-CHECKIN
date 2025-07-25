@@ -2,8 +2,6 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime
 import os
-from streamlit_autorefresh import st_autorefresh
-import json
 
 # --- Config ---
 DATA_FILE = "checkin_log.csv"
@@ -69,8 +67,15 @@ if admin_pin == ADMIN_PIN:
     st.session_state.admin_logged_in = True
     st.success("Access granted.")
 
-    # Auto-refresh every 10 seconds
-    st_autorefresh(interval=10 * 1000, key="admin_refresh")
+    # Auto-refresh every 10 seconds ONLY in admin view
+    refresh_seconds = 10
+    st.markdown(f"""
+        <script>
+            setTimeout(function() {{
+                window.location.reload();
+            }}, {refresh_seconds * 1000});
+        </script>
+    """, unsafe_allow_html=True)
 
     if os.path.exists(DATA_FILE):
         df = pd.read_csv(DATA_FILE)
@@ -84,7 +89,7 @@ if admin_pin == ADMIN_PIN:
             # Visual Alert
             st.markdown("## 🔔 **New Check-In/Out Submitted!**")
 
-            # Sound Alert
+            # Sound Alert (may not autoplay in some browsers)
             st.markdown("""
                 <audio autoplay>
                     <source src="https://www.myinstants.com/media/sounds/ding-sound-effect_2.mp3" type="audio/mpeg">
